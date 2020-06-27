@@ -3,49 +3,76 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { subscribeToDocumentChanges, EMOJI_MENTION } from "./diagnostics";
 import slugify from "slugify";
 import { v4 as uuidv4 } from "uuid";
 import * as parser from "fast-xml-parser";
+import { j2xParser as JsonToXml } from "fast-xml-parser";
 
-const MarketplaceCommand = "csproj-extensions.command.MARKETPLACE";
+const COMMAND_MARKETPLACE = "csproj-extensions.command.MARKETPLACE";
+const COMMAND_APPENDPROPSFILE = "csproj-extensions.command.APPENDPROPSFILE";
 
-function getParameters(content: String) {
+function getParameters(filePath: string) {
   const parameters = [];
-  const regexRoot = /<PropertyGroup>(.+?)<\/PropertyGroup>/gm;
-  const contentString = content.replace(/\n/gm, "").toString();
+  try {
+    const content = fs.readFileSync(filePath, "utf-8").toString();
 
-  let m;
-  while ((m = regexRoot.exec(contentString)) !== null) {
-    // This is necessary to avoid infinite loops with zero-width matches
-    if (m.index === regexRoot.lastIndex) {
-      regexRoot.lastIndex++;
-    }
+    const regexRoot = /<PropertyGroup>(.+?)<\/PropertyGroup>/gm;
+    const contentString = content.replace(/\n/gm, "").toString();
 
-    const parametersContent = m[1];
-
-    const regexParameter = /<(.+?)>(.+?)<\/(.+?)>/gm;
-
-    let mp;
-
-    while ((mp = regexParameter.exec(parametersContent)) !== null) {
-      // This is necessary to avoid infinite loops with zero-width matches
-      if (mp.index === regexParameter.lastIndex) {
-        regexParameter.lastIndex++;
+    let m;
+    while ((m = regexRoot.exec(contentString)) !== null) {
+      if (m.index === regexRoot.lastIndex) {
+        regexRoot.lastIndex++;
       }
 
-      parameters.push({
-        name: mp[1],
-        value: mp[2],
-      });
-    }
+      const parametersContent = m[1];
 
-    return parameters;
+      const regexParameter = /<(.+?)>(.+?)<\/(.+?)>/gm;
+
+      let mp;
+
+      while ((mp = regexParameter.exec(parametersContent)) !== null) {
+        if (mp.index === regexParameter.lastIndex) {
+          regexParameter.lastIndex++;
+        }
+
+        parameters.push({
+          name: mp[1],
+          value: mp[2],
+        });
+      }
+
+      return parameters;
+    }
+  } catch (error) {
+    console.error(error);
   }
+  return parameters;
 }
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+function GetPropsFiles(document: vscode.TextDocument) {
+  const files = [];
+  const importRegex = /\<Import Project="(.+?)" \/>/gm;
+  const content = document.getText();
+  const documentFilePath = path.parse(document.fileName).dir;
+
+  let m;
+  while ((m = importRegex.exec(content)) !== null) {
+    if (m.index === importRegex.lastIndex) {
+      importRegex.lastIndex++;
+    }
+
+    const importFileName = m[1];
+    if (!importFileName) {
+      continue;
+    }
+
+    files.push(path.join(documentFilePath, importFileName));
+  }
+
+  return files;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('"csproj-extensions" is activated and up and running!');
 
@@ -56,38 +83,11 @@ export function activate(context: vscode.ExtensionContext) {
       token: vscode.CancellationToken,
       context: vscode.CompletionContext
     ) {
-      // if (position.character < 1 || position.line < 0) {
-      //   return [];
-      // }
-      // const beforeChar = document.lineAt(position.line).text[
-      //   position.character - 1
-      // ];
-      // if (beforeChar !== "$") {
-      //   return [];
-      // }
+      const files = GetPropsFiles(document);
 
-      const importRegex = /\<Import Project="(.+?)" \/>/gm;
-
-      let m;
-
-      const documentText = document.getText();
-
-      while ((m = importRegex.exec(documentText)) !== null) {
-        // This is importRegex to avoid infinite loops with zero-width matches
-        if (m.index === importRegex.lastIndex) {
-          importRegex.lastIndex++;
-        }
-
-        const importFileName = m[1];
-        if (!importFileName) {
-          continue;
-        }
-
-        const documentFilePath = path.parse(document.fileName).dir;
-        const importFilePath = path.join(documentFilePath, importFileName);
+      files.forEach((filePath) => {
         try {
-          const file = fs.readFileSync(importFilePath, "utf-8");
-          const parameters = getParameters(file);
+          const parameters = getParameters(filePath);
           console.debug(parameters);
 
           const completions: vscode.ProviderResult<
@@ -114,23 +114,12 @@ export function activate(context: vscode.ExtensionContext) {
         } catch (error) {
           console.error(error);
         }
-      }
+      });
       return [];
     },
   });
 
   context.subscriptions.push(xmlCompletion);
-
-  // let disposable = vscode.commands.registerCommand(
-  //   "csproj-extensions.toggleExtensionState",
-  //   () => {
-  //     // The code you place here will be executed every time your command is executed
-  //     // Display a message box to the user
-  //     vscode.window.showInformationMessage("Activated!");
-  //   }
-  // );
-
-  // context.subscriptions.push(disposable);
 
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
@@ -142,26 +131,62 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // const emojiDiagnostics = vscode.languages.createDiagnosticCollection("emoji");
-  // context.subscriptions.push(emojiDiagnostics);
-
-  // subscribeToDocumentChanges(context, emojiDiagnostics);
-
-  // context.subscriptions.push(
-  //   vscode.languages.registerCodeActionsProvider("xml", new Emojinfo(), {
-  //     providedCodeActionKinds: Emojinfo.providedCodeActionKinds,
-  //   })
-  // );
-
   context.subscriptions.push(
-    vscode.commands.registerCommand(MarketplaceCommand, (data) => {
-      console.debug(data);
+    vscode.commands.registerCommand(COMMAND_MARKETPLACE, () =>
       vscode.env.openExternal(
         vscode.Uri.parse(
           "https://marketplace.visualstudio.com/items?itemName=selcukermaya.se-csproj-extensions"
         )
-      );
-    })
+      )
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      COMMAND_APPENDPROPSFILE,
+      async (tag: any, document: vscode.TextDocument, range: vscode.Range) => {
+        if (!tag) {
+          return;
+        }
+
+        if (!tag.replacement) {
+          const inputValue = await vscode.window.showInputBox({});
+          if (!`${inputValue}`.trim()) {
+            return;
+          }
+          tag.replacement = `$(${inputValue})`;
+        }
+
+        const posStart = new vscode.Position(range.start.line, tag.start);
+        const posEnd = new vscode.Position(range.start.line, tag.end);
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(
+          document.uri,
+          new vscode.Range(posStart, posEnd),
+          tag.replacement
+        );
+        vscode.workspace.applyEdit(edit);
+
+        const filePath = `${GetPropsFiles(document).find((x) => true)}`;
+
+        const fileContent = fs.readFileSync(filePath, "utf-8");
+        const parsed = parser.parse(fileContent);
+
+        const keys = Object.keys(parsed.Project.PropertyGroup);
+        if (keys.some((x) => x === tag.property)) {
+          return;
+        }
+
+        parsed.Project.PropertyGroup[tag.property] = tag.value;
+        console.debug(parsed);
+        const jsonToXml = new JsonToXml({
+          format: true,
+        });
+        var xml = jsonToXml.parse(parsed);
+        console.debug(xml);
+        fs.writeFileSync(filePath, xml);
+      }
+    )
   );
 }
 
@@ -186,13 +211,13 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
     const actions = [];
 
     if (xmlTag) {
-      const replaceXmlTag = this.createFix(document, range, xmlTag);
+      const replaceXmlTag = this.createFixCommand(document, range, xmlTag);
       actions.push(replaceXmlTag);
     }
 
     if (xmlAttributesTag && xmlAttributesTag.length) {
       xmlAttributesTag.forEach((attr) => {
-        const replaceXmlTag = this.createFix(document, range, attr);
+        const replaceXmlTag = this.createFixCommand(document, range, attr);
         replaceXmlTag.isPreferred = attr.prefer;
         actions.push(replaceXmlTag);
       });
@@ -311,7 +336,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
     };
   }
 
-  private createFix(
+  private createFixCommand(
     document: vscode.TextDocument,
     range: vscode.Range,
     tag: any
@@ -320,19 +345,10 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
       `Extract ${tag.name} [${tag.value}] to props file`,
       vscode.CodeActionKind.QuickFix
     );
-    const posStart = new vscode.Position(range.start.line, tag.start);
-    const posEnd = new vscode.Position(range.start.line, tag.end);
-    action.edit = new vscode.WorkspaceEdit();
-    action.edit.replace(
-      document.uri,
-      new vscode.Range(posStart, posEnd),
-      tag.replacement
-    );
-
     action.command = {
-      command: MarketplaceCommand,
-      title: "Learn more about this extension",
-      tooltip: "This will open extensions market place page.",
+      command: COMMAND_APPENDPROPSFILE,
+      title: "Append props file if not exists",
+      arguments: [tag, document, range],
     };
 
     return action;
@@ -344,7 +360,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
       vscode.CodeActionKind.Empty
     );
     action.command = {
-      command: MarketplaceCommand,
+      command: COMMAND_MARKETPLACE,
       title: "Learn more about this extension",
       tooltip: "This will open extensions market place page.",
     };
@@ -352,42 +368,14 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
   }
 }
 
-/**
- * Provides code actions corresponding to diagnostic problems.
- */
-export class Emojinfo implements vscode.CodeActionProvider {
-  public static readonly providedCodeActionKinds = [
-    vscode.CodeActionKind.QuickFix,
-  ];
-
-  provideCodeActions(
-    document: vscode.TextDocument,
-    range: vscode.Range | vscode.Selection,
-    context: vscode.CodeActionContext,
-    token: vscode.CancellationToken
-  ): vscode.CodeAction[] {
-    // for each diagnostic entry that has the matching `code`, create a code action command
-    return context.diagnostics
-      .filter((diagnostic) => diagnostic.code === EMOJI_MENTION)
-      .map((diagnostic) => this.createCommandCodeAction(diagnostic));
-  }
-
-  private createCommandCodeAction(
-    diagnostic: vscode.Diagnostic
-  ): vscode.CodeAction {
-    const action = new vscode.CodeAction(
-      "Learn more...",
-      vscode.CodeActionKind.QuickFix
-    );
-    action.command = {
-      command: MarketplaceCommand,
-      title: "Learn more about emojis",
-      tooltip: "This will open the unicode emoji page.",
-    };
-    action.diagnostics = [diagnostic];
-    action.isPreferred = true;
-    return action;
-  }
+function GetParametersFileContent(
+  document: vscode.TextDocument,
+  importFileName: string
+) {
+  const documentFilePath = path.parse(document.fileName).dir;
+  const importFilePath = path.join(documentFilePath, importFileName);
+  const file = fs.readFileSync(importFilePath, "utf-8");
+  return file;
 }
 
 // this method is called when your extension is deactivated
