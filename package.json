@@ -1,8 +1,8 @@
 {
   "name": "se-csproj-extensions",
   "displayName": "csproj Extensions",
-  "description": "Intellisense for your csproj files.",
-  "version": "0.0.2",
+  "description": "Intellisense for your csproj files. It will detect your props file and will give you completion for it.",
+  "version": "0.0.3",
   "engines": {
     "vscode": "^1.46.0"
   },
@@ -11,29 +11,44 @@
     "type": "git",
     "url": "https://github.com/se/vscode-csproj-extensions"
   },
+  "bugs": {
+    "url": "https://github.com/se/vscode-csproj-extensions/issues"
+  },
+  "icon": "",
   "author": {
     "name": "Selçuk Ermaya",
     "email": "selcukermaya@gmail.com",
     "url": "https://selcukermaya.com"
+  },
+  "keywords": [
+    "csproj",
+    "csharp",
+    "extensions",
+    "project",
+    "csharpproject",
+    "visualstudio"
+  ],
+  "galleryBanner": {
+    "color": "#333333",
+    "theme": "dark"
   },
   "categories": [
     "Other"
   ],
   "license": "MIT",
   "activationEvents": [
-    "onCommand:csproj-extensions.toggleExtensionState"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "csproj-extensions.toggleExtensionState",
-        "title": "Enable / Disable csproj Extension"
-      }
-    ]
+    "commands": []
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",
+    "pkg": "mkdir -p publish && vsce package --out ./publish/",
+    "clean": "git clean -Xdf -e !node_modules -e !node_modules/**/*",
+    "pub": "vsce publish",
+    "reset": "yarn run clean && yarn --frozen-lockfile",
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts",
     "watch": "tsc -watch -p ./",
