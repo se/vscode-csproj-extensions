@@ -21,5 +21,4 @@ CONTRIBUTING.md
 .prettierignore
 .prettierrc
 node_modules/**
-images/**
 publish/**

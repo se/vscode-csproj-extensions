@@ -2,7 +2,7 @@
   "name": "se-csproj-extensions",
   "displayName": "csproj Extensions",
   "description": "Intellisense for your csproj files. It will detect your props file and will give you completion for it.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "engines": {
     "vscode": "^1.46.0"
   },
@@ -14,7 +14,7 @@
   "bugs": {
     "url": "https://github.com/se/vscode-csproj-extensions/issues"
   },
-  "icon": "",
+  "icon": "images/logo.png",
   "author": {
     "name": "Selçuk Ermaya",
     "email": "selcukermaya@gmail.com",
