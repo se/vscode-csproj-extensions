@@ -6,6 +6,7 @@
   "engines": {
     "vscode": "^1.46.0"
   },
+  "publisher": "selcukermaya",
   "repository": {
     "type": "git",
     "url": "https://github.com/se/vscode-csproj-extensions"

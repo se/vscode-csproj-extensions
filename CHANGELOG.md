@@ -1,9 +1,7 @@
 # Change Log
 
-All notable changes to the "csproj-extensions" extension will be documented in this file.
+All notable changes to the "csproj-extensions" extension will be documented in this file.ture this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+## [0.0.2] - 2020-06-27
 
-## [Unreleased]
-
-- Initial release
+- Completion for props files.
