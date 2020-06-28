@@ -1,12 +1,11 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import slugify from "slugify";
-import { v4 as uuidv4 } from "uuid";
-import * as parser from "fast-xml-parser";
-import { j2xParser as JsonToXml } from "fast-xml-parser";
+
+const uuid = require("uuid");
+const parser = require("fast-xml-parser/src/parser");
+const JsonToXml = require("fast-xml-parser/src/parser").j2xParser;
 
 const COMMAND_MARKETPLACE = "csproj-extensions.command.MARKETPLACE";
 const COMMAND_APPENDPROPSFILE = "csproj-extensions.command.APPENDPROPSFILE";
@@ -149,13 +148,18 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        if (!tag.replacement) {
-          const inputValue = await vscode.window.showInputBox({});
-          if (!`${inputValue}`.trim()) {
-            return;
-          }
-          tag.replacement = `$(${inputValue})`;
+        const property = await vscode.window.showInputBox({
+          placeHolder: "Type your property name",
+          prompt: "Property Name",
+          value: tag.property,
+        });
+
+        if (!property || !`${property}`.trim()) {
+          return;
         }
+
+        tag.property = property;
+        tag.replacement = `$(${property})`;
 
         const posStart = new vscode.Position(range.start.line, tag.start);
         const posEnd = new vscode.Position(range.start.line, tag.end);
@@ -179,6 +183,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         parsed.Project.PropertyGroup[tag.property] = tag.value;
         console.debug(parsed);
+
         const jsonToXml = new JsonToXml({
           format: true,
         });
@@ -250,7 +255,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
 
     let m;
 
-    const id = uuidv4();
+    const id = uuid.v4();
 
     while ((m = rex.exec(line.text)) !== null) {
       if (m.index === rex.lastIndex) {
@@ -290,6 +295,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
       if (!includeAttr) {
         return;
       }
+
       const slug = slugify(includeAttr.value, { remove: /[\.\/\\]/g });
       attr.property = `${slug}Version`;
       attr.replacement = `$(${attr.property})`;
