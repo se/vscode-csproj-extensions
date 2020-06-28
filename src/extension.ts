@@ -290,7 +290,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
       if (!includeAttr) {
         return;
       }
-      const slug = slugify(includeAttr.value, { remove: /\./g });
+      const slug = slugify(includeAttr.value, { remove: /[\.\/\\]/g });
       attr.property = `${slug}Version`;
       attr.replacement = `$(${attr.property})`;
       attr.prefer = true;
