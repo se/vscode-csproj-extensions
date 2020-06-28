@@ -2,6 +2,10 @@
 
 All notable changes to the "csproj-extensions" extension will be documented in this file.ture this file.
 
+## [0.0.7] - 2020-06-28
+
+- Bugfix on excluded files.
+
 ## [0.0.6] - 2020-06-28
 
 - You can now extract values from csproj files to your props file.
