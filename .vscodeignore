@@ -20,5 +20,4 @@ CONTRIBUTING.md
 .gitignore-revs
 .prettierignore
 .prettierrc
-node_modules/**
 publish/**

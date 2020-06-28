@@ -1,76 +1,14 @@
+// The module 'vscode' contains the VS Code extensibility API
+// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import slugify from "slugify";
-
-const uuid = require("uuid");
-const parser = require("fast-xml-parser/src/parser");
-const JsonToXml = require("fast-xml-parser/src/parser").j2xParser;
+import { v4 as uuid } from "uuid";
+import * as parser from "fast-xml-parser";
 
 const COMMAND_MARKETPLACE = "csproj-extensions.command.MARKETPLACE";
 const COMMAND_APPENDPROPSFILE = "csproj-extensions.command.APPENDPROPSFILE";
-
-function getParameters(filePath: string) {
-  const parameters = [];
-  try {
-    const content = fs.readFileSync(filePath, "utf-8").toString();
-
-    const regexRoot = /<PropertyGroup>(.+?)<\/PropertyGroup>/gm;
-    const contentString = content.replace(/\n/gm, "").toString();
-
-    let m;
-    while ((m = regexRoot.exec(contentString)) !== null) {
-      if (m.index === regexRoot.lastIndex) {
-        regexRoot.lastIndex++;
-      }
-
-      const parametersContent = m[1];
-
-      const regexParameter = /<(.+?)>(.+?)<\/(.+?)>/gm;
-
-      let mp;
-
-      while ((mp = regexParameter.exec(parametersContent)) !== null) {
-        if (mp.index === regexParameter.lastIndex) {
-          regexParameter.lastIndex++;
-        }
-
-        parameters.push({
-          name: mp[1],
-          value: mp[2],
-        });
-      }
-
-      return parameters;
-    }
-  } catch (error) {
-    console.error(error);
-  }
-  return parameters;
-}
-
-function GetPropsFiles(document: vscode.TextDocument) {
-  const files = [];
-  const importRegex = /\<Import Project="(.+?)" \/>/gm;
-  const content = document.getText();
-  const documentFilePath = path.parse(document.fileName).dir;
-
-  let m;
-  while ((m = importRegex.exec(content)) !== null) {
-    if (m.index === importRegex.lastIndex) {
-      importRegex.lastIndex++;
-    }
-
-    const importFileName = m[1];
-    if (!importFileName) {
-      continue;
-    }
-
-    files.push(path.join(documentFilePath, importFileName));
-  }
-
-  return files;
-}
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('"csproj-extensions" is activated and up and running!');
@@ -184,7 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
         parsed.Project.PropertyGroup[tag.property] = tag.value;
         console.debug(parsed);
 
-        const jsonToXml = new JsonToXml({
+        const jsonToXml = new parser.j2xParser({
           format: true,
         });
         var xml = jsonToXml.parse(parsed);
@@ -195,9 +133,68 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-/**
- * Provides code actions for converting :) to a smiley emoji.
- */
+function getParameters(filePath: string) {
+  const parameters = [];
+  try {
+    const content = fs.readFileSync(filePath, "utf-8").toString();
+
+    const regexRoot = /<PropertyGroup>(.+?)<\/PropertyGroup>/gm;
+    const contentString = content.replace(/\n/gm, "").toString();
+
+    let m;
+    while ((m = regexRoot.exec(contentString)) !== null) {
+      if (m.index === regexRoot.lastIndex) {
+        regexRoot.lastIndex++;
+      }
+
+      const parametersContent = m[1];
+
+      const regexParameter = /<(.+?)>(.+?)<\/(.+?)>/gm;
+
+      let mp;
+
+      while ((mp = regexParameter.exec(parametersContent)) !== null) {
+        if (mp.index === regexParameter.lastIndex) {
+          regexParameter.lastIndex++;
+        }
+
+        parameters.push({
+          name: mp[1],
+          value: mp[2],
+        });
+      }
+
+      return parameters;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  return parameters;
+}
+
+function GetPropsFiles(document: vscode.TextDocument) {
+  const files = [];
+  const importRegex = /\<Import Project="(.+?)" \/>/gm;
+  const content = document.getText();
+  const documentFilePath = path.parse(document.fileName).dir;
+
+  let m;
+  while ((m = importRegex.exec(content)) !== null) {
+    if (m.index === importRegex.lastIndex) {
+      importRegex.lastIndex++;
+    }
+
+    const importFileName = m[1];
+    if (!importFileName) {
+      continue;
+    }
+
+    files.push(path.join(documentFilePath, importFileName));
+  }
+
+  return files;
+}
+
 export class ValueExtractorProvider implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [
     vscode.CodeActionKind.QuickFix,
@@ -213,7 +210,11 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
       return;
     }
 
-    const actions = [];
+    const actions: vscode.CodeAction[] | undefined = [];
+
+    if (!GetPropsFiles(document).some((x) => true)) {
+      return actions;
+    }
 
     if (xmlTag) {
       const replaceXmlTag = this.createFixCommand(document, range, xmlTag);
@@ -228,8 +229,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
       });
     }
 
-    const commandAction = this.createCommand();
-    actions.push(commandAction);
+    actions.push(this.createCommand());
     return actions;
   }
 
@@ -255,7 +255,7 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
 
     let m;
 
-    const id = uuid.v4();
+    const id = uuid();
 
     while ((m = rex.exec(line.text)) !== null) {
       if (m.index === rex.lastIndex) {
@@ -372,16 +372,6 @@ export class ValueExtractorProvider implements vscode.CodeActionProvider {
     };
     return action;
   }
-}
-
-function GetParametersFileContent(
-  document: vscode.TextDocument,
-  importFileName: string
-) {
-  const documentFilePath = path.parse(document.fileName).dir;
-  const importFilePath = path.join(documentFilePath, importFileName);
-  const file = fs.readFileSync(importFilePath, "utf-8");
-  return file;
 }
 
 // this method is called when your extension is deactivated
